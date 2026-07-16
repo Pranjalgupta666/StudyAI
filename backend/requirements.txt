@@ -1,0 +1,26 @@
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9
+pydantic==2.7.1
+pydantic-settings==2.2.1
+
+# Free AI — Google Gemini
+google-generativeai==0.7.2
+
+# Free embeddings — runs locally, no API key
+sentence-transformers==3.0.1
+
+# Free vector DB — runs locally on disk
+chromadb==0.5.0
+
+# Free DB — SQLite (built into Python)
+sqlalchemy[asyncio]==2.0.30
+aiosqlite==0.20.0
+
+# PDF processing
+pymupdf==1.24.3
+langchain-text-splitters==0.2.0
+
+aiofiles==23.2.1
+python-dotenv==1.0.1
+httpx==0.27.0

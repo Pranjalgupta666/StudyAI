@@ -2,8 +2,13 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, Bot, User, Loader2 } from "lucide-react";
 import { streamAsk } from "@/lib/api";
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+  streaming?: boolean;
+}
 export default function ChatPanel({ docId }) {
-  const [messages, setMessages] = useState([{ role: "assistant", content: "Hi! I have read your document. Ask me anything about it." }]);
+const [messages, setMessages] = useState<Message[]>([{ role: "assistant", content: "Hi! I have read your document. Ask me anything!" }]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);

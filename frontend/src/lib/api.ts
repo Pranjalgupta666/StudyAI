@@ -1,4 +1,14 @@
-﻿const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+﻿export interface DocumentRecord {
+  doc_id: string;
+  filename: string;
+  status: "uploading" | "processing" | "ready" | "failed";
+  page_count: number;
+  chunk_count: number;
+  file_size_bytes?: number;
+  created_at?: string;
+}
+
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 export async function uploadPDF(file, userId = "demo-user") {
   const form = new FormData(); form.append("file", file);
   const res = await fetch(`${API}/documents/upload?user_id=${userId}`, { method: "POST", body: form });

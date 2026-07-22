@@ -1,8 +1,7 @@
 import fitz  # PyMuPDF
 import uuid
 import logging
-import chromadb
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import update
@@ -13,11 +12,11 @@ from app.models.document import Document, DocumentStatus
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# ── Local models — load once at startup ──────────────────────────────────────
-# First run downloads ~90MB model to ~/.cache/huggingface — one-time only
-embedder = SentenceTransformer(settings.EMBEDDING_MODEL)
+# Lightweight embedder — only 60MB, works on free tier
+embedder = TextEmbedding("BAAI/bge-small-en-v1.5")
 
-# ChromaDB persists to disk — no account, no key
+# ChromaDB
+import chromadb
 chroma_client = chromadb.PersistentClient(path=settings.CHROMA_DIR)
 collection = chroma_client.get_or_create_collection(
     name="studyai_docs",
@@ -50,22 +49,23 @@ def chunk_pages(pages: list[dict]) -> list[dict]:
 
 
 def embed_chunks(texts: list[str]) -> list[list[float]]:
-    """Run sentence-transformers locally — completely free, no API call."""
-    vectors = embedder.encode(texts, show_progress_bar=False)
-    return vectors.tolist()
+    """Use fastembed — lightweight, no torch needed."""
+    return [v.tolist() for v in embedder.embed(texts)]
 
 
 def upsert_to_chroma(doc_id: str, user_id: str, chunks: list[dict]) -> list[str]:
-    """Store vectors + text in local ChromaDB."""
     texts = [c["text"] for c in chunks]
     vectors = embed_chunks(texts)
-
     ids = [f"{doc_id}-{i}" for i in range(len(chunks))]
     metadatas = [
-        {"doc_id": doc_id, "user_id": user_id, "page_number": c["page_number"], "chunk_index": i}
+        {
+            "doc_id": doc_id,
+            "user_id": user_id,
+            "page_number": c["page_number"],
+            "chunk_index": i,
+        }
         for i, c in enumerate(chunks)
     ]
-
     collection.upsert(
         ids=ids,
         embeddings=vectors,
@@ -78,29 +78,23 @@ def upsert_to_chroma(doc_id: str, user_id: str, chunks: list[dict]) -> list[str]
 async def ingest_pdf(doc_id: str, user_id: str, contents: bytes, db: AsyncSession) -> None:
     try:
         logger.info(f"[{doc_id}] Starting ingestion")
-
         await db.execute(
             update(Document).where(Document.id == doc_id)
             .values(status=DocumentStatus.PROCESSING)
         )
         await db.commit()
 
-        # 1. Extract text
         pages, page_count = extract_text(contents)
-        logger.info(f"[{doc_id}] {page_count} pages extracted")
-
-        # 2. Chunk
         chunks = chunk_pages(pages)
-        logger.info(f"[{doc_id}] {len(chunks)} chunks created")
-
-        # 3. Embed + store in ChromaDB (all local, all free)
         upsert_to_chroma(doc_id, user_id, chunks)
-        logger.info(f"[{doc_id}] Stored in ChromaDB")
 
-        # 4. Mark ready
         await db.execute(
             update(Document).where(Document.id == doc_id)
-            .values(status=DocumentStatus.READY, page_count=page_count, chunk_count=len(chunks))
+            .values(
+                status=DocumentStatus.READY,
+                page_count=page_count,
+                chunk_count=len(chunks),
+            )
         )
         await db.commit()
         logger.info(f"[{doc_id}] Done ✓")

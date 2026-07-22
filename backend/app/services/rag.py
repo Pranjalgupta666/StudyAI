@@ -12,7 +12,7 @@ groq_client = Groq(api_key=settings.GEMINI_API_KEY)
 
 def retrieve_chunks(question: str, doc_id: str) -> list[dict]:
     """Embed query locally, search ChromaDB locally — 100% free."""
-    query_vector = embedder.encode([question])[0].tolist()
+    query_vector = list(embedder.embed([question]))[0].tolist()
     results = collection.query(
         query_embeddings=[query_vector],
         n_results=settings.TOP_K_RESULTS,
